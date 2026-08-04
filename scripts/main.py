@@ -40,11 +40,21 @@ def _set_info(set_id):
 
 
 def cmd_build(args):
-    set_id, list_type = next_post(FEATURED_SETS)
-    set_name, set_logo_url = _set_info(set_id)
-    most_expensive = list_type == "most_expensive"
+    # Very new/obscure sets sometimes have zero TCGPlayer pricing data yet
+    # on pokemontcg.io — skip forward through the rotation instead of
+    # crashing on an empty card list.
+    cards = []
+    for attempt in range(len(FEATURED_SETS) * 2 + 2):
+        set_id, list_type = next_post(FEATURED_SETS)
+        set_name, set_logo_url = _set_info(set_id)
+        most_expensive = list_type == "most_expensive"
+        cards = top_n_by_price(set_id, n=LIST_LENGTH, most_expensive=most_expensive)
+        if cards:
+            break
+        print(f"WARNING: 0 priced cards for {set_id} ({list_type}) — skipping to next", file=sys.stderr)
+    else:
+        raise RuntimeError("No featured set had any priced cards — check FEATURED_SETS in config.py")
 
-    cards = top_n_by_price(set_id, n=LIST_LENGTH, most_expensive=most_expensive)
     if len(cards) < LIST_LENGTH:
         print(f"WARNING: only found {len(cards)} priced cards for {set_id}", file=sys.stderr)
 
