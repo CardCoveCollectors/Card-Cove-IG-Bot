@@ -24,7 +24,7 @@ import time
 from config import FEATURED_SETS, LIST_LENGTH, BRAND_NAME, BRAND_HANDLE
 from rotation import next_post
 from fetch_prices import top_n_by_price, get_all_sets
-from build_image import build_list_image
+from build_image_pokemon import build_list_image
 from caption import build_caption
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
