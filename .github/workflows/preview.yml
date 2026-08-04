@@ -1,0 +1,36 @@
+name: Generate Preview Post (no Instagram)
+
+# Manual-only — lets you see a real, finished post (real card art, real set
+# logo, live prices) without publishing anything or needing Instagram/Meta
+# credentials at all. Safe to run as many times as you want.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build one post (image + caption) — not committed, not published
+        env:
+          POKEMONTCG_API_KEY: ${{ secrets.POKEMONTCG_API_KEY }}
+        run: python scripts/main.py build
+
+      - name: Show the caption in the run log
+        run: cat posts/latest.json
+
+      - name: Upload the generated image so you can download and view it
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-post
+          path: posts/
+          retention-days: 7
