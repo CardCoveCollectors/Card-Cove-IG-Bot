@@ -11,8 +11,21 @@ it'll be picked up automatically.
 import os
 import time
 import requests
+from requests.adapters import HTTPAdapter, Retry
 
 API_BASE = "https://api.pokemontcg.io/v2"
+
+# pokemontcg.io's free tier is occasionally flaky (500s under load,
+# especially without an API key) — retry transient failures automatically
+# with a short backoff instead of letting one bad response fail the run.
+_session = requests.Session()
+_retries = Retry(
+    total=5,
+    backoff_factor=2,  # 2s, 4s, 8s, 16s, 32s
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["GET"],
+)
+_session.mount("https://", HTTPAdapter(max_retries=_retries))
 
 
 def _headers():
@@ -22,7 +35,7 @@ def _headers():
 
 def get_all_sets():
     """Return all sets, newest first."""
-    resp = requests.get(
+    resp = _session.get(
         f"{API_BASE}/sets",
         params={"orderBy": "-releaseDate", "pageSize": 250},
         headers=_headers(),
@@ -51,7 +64,7 @@ def get_cards_for_set(set_id):
     cards = []
     page = 1
     while True:
-        resp = requests.get(
+        resp = _session.get(
             f"{API_BASE}/cards",
             params={"q": f"set.id:{set_id}", "page": page, "pageSize": 250},
             headers=_headers(),
