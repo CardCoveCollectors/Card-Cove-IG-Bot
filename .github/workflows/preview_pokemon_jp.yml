@@ -1,0 +1,37 @@
+name: Generate Pokemon Japan Preview Post (no Instagram)
+
+# Manual-only — lets you see a real, finished Japanese Pokemon post
+# (real card names/prices, placeholder card art for now) without
+# publishing anything or needing Instagram/Meta credentials at all.
+# Safe to run as many times as you want.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build one post pair (image + caption) — not committed, not published
+        env:
+          POKEWALLET_API_KEY: ${{ secrets.POKEWALLET_API_KEY }}
+        run: python scripts/main_pokemon_jp.py build
+
+      - name: Show the captions in the run log
+        run: cat posts/latest_pokemon_jp.json
+
+      - name: Upload the generated images so you can download and view them
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-post-pokemon-jp
+          path: posts/
+          retention-days: 7
