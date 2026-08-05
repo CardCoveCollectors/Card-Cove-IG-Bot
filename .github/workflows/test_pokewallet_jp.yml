@@ -1,8 +1,9 @@
 name: TEST - PokeWallet JP Sets (temporary, safe to delete after)
 
 # One-off manual test to see what the /op/sets?language=jp response looks
-# like. Doesn't touch posts/, doesn't publish anything, doesn't commit
-# anything. Delete this file (and the workflow) once we've seen the output.
+# like, and whether "Alt Art" (or similar) shows up in JP card names.
+# Doesn't touch posts/, doesn't publish anything, doesn't commit anything.
+# Delete this file (and the workflow) once we've seen the output.
 
 on:
   workflow_dispatch: {}
@@ -11,23 +12,38 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch Japanese One Piece sets
+      - name: Scan a few JP sets for "alt" in card names
         env:
           POKEWALLET_API_KEY: ${{ secrets.POKEWALLET_API_KEY }}
         run: |
-          curl -s -H "X-API-Key: $POKEWALLET_API_KEY" \
-            "https://api.pokewallet.io/op/sets?language=jp" | python3 -m json.tool
+          python3 << 'EOF'
+          import urllib.request, json, os
 
-      - name: Fetch one JP set's cards by group_id (Romance Dawn JP = -3)
-        env:
-          POKEWALLET_API_KEY: ${{ secrets.POKEWALLET_API_KEY }}
-        run: |
-          curl -s -H "X-API-Key: $POKEWALLET_API_KEY" \
-            "https://api.pokewallet.io/op/sets/-3?page=1&limit=5" | python3 -m json.tool
+          key = os.environ["POKEWALLET_API_KEY"]
 
-      - name: Also try by set_code directly (OP01-JP) for comparison
-        env:
-          POKEWALLET_API_KEY: ${{ secrets.POKEWALLET_API_KEY }}
-        run: |
-          curl -s -H "X-API-Key: $POKEWALLET_API_KEY" \
-            "https://api.pokewallet.io/op/sets/OP01-JP?page=1&limit=5" | python3 -m json.tool
+          # group_id -> label, from the earlier /op/sets?language=jp scan
+          sets = {
+              "-3": "OP01-JP Romance Dawn",
+              "-25": "OP07-JP 500 Years in the Future",
+              "-28": "OP16-JP The Time of Battle",
+              "-8": "EB-01-JP Memorial Collection",
+          }
+
+          for gid, label in sets.items():
+              url = f"https://api.pokewallet.io/op/sets/{gid}?page=1&limit=200"
+              req = urllib.request.Request(url, headers={"X-API-Key": key})
+              with urllib.request.urlopen(req) as resp:
+                  data = json.load(resp)
+
+              total = data.get("total")
+              cards = data.get("data", [])
+              matches = [c["name"] for c in cards if c.get("name") and "alt" in c["name"].lower()]
+
+              print(f"\n=== {label} (group_id {gid}) — total={total}, fetched={len(cards)}, alt-matches={len(matches)} ===")
+              for m in matches[:20]:
+                  print("   ", m)
+              if not matches:
+                  print("   (no 'alt' matches — showing 5 sample names instead)")
+                  for c in cards[:5]:
+                      print("   sample:", c.get("name"))
+          EOF
