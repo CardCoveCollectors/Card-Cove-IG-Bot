@@ -1,0 +1,28 @@
+name: TEST - PokeWallet JP Sets (temporary, safe to delete after)
+
+# One-off manual test to see what the /op/sets?language=jp response looks
+# like. Doesn't touch posts/, doesn't publish anything, doesn't commit
+# anything. Delete this file (and the workflow) once we've seen the output.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Japanese One Piece sets
+        env:
+          POKEWALLET_API_KEY: ${{ secrets.POKEWALLET_API_KEY }}
+        run: |
+          curl -s -H "X-API-Key: $POKEWALLET_API_KEY" \
+            "https://api.pokewallet.io/op/sets?language=jp" | python3 -m json.tool
+
+      - name: Fetch one JP set's cards (first page, small limit)
+        env:
+          POKEWALLET_API_KEY: ${{ secrets.POKEWALLET_API_KEY }}
+        run: |
+          echo "Edit SET_CODE below to match a real set_code from the output above, then re-run if needed."
+          SET_CODE="OP01"
+          curl -s -H "X-API-Key: $POKEWALLET_API_KEY" \
+            "https://api.pokewallet.io/op/sets/$SET_CODE?page=1&limit=3&language=jp" | python3 -m json.tool
