@@ -1,0 +1,98 @@
+"""
+One-off batch preview: renders the new grid poster for every set Card
+Cove Collectors tracks — the 16 mainline OP-01 through OP-16 releases,
+plus every Extra Booster (EB) and Premium Booster (PRB) that's come out
+— both list types each, so you can see how the whole run of sets will
+look before it's live. This does NOT touch the normal rotation state
+(state_onepiece.json) or publish anything — it's purely a visual check,
+meant to be run manually and its output downloaded as a GitHub Actions
+artifact.
+
+    python preview_all_onepiece.py
+
+Note: OP-14 and OP-15 were never released as their own standalone
+booster on optcgapi.com — they shipped bundled with an Extra Booster as
+"OP14-EB04" and "OP15-EB04". Those combined-set codes are used here in
+their place so all 16 numbered mainline releases are covered.
+
+This list is just SET_LIST grouped for readability (mainline, then EB,
+then PRB) — it covers the exact same 21 sets as FEATURED_SETS in
+config_onepiece.py, just not in rotation order. If a new EB/PRB or a
+future OP-17+ set gets added to FEATURED_SETS, add it here too.
+"""
+import os
+import sys
+import time
+
+import requests
+
+from config_onepiece import LIST_LENGTH, BRAND_NAME, BRAND_HANDLE, ALT_ART_MARKERS, FEATURED_SETS
+from fetch_prices_onepiece import top_n_by_price, get_all_sets
+from build_image_onepiece import build_list_image
+
+ROOT = os.path.join(os.path.dirname(__file__), "..")
+OUT_DIR = os.path.join(ROOT, "preview_all_onepiece")
+
+# OP-01 through OP-16 (mainline, using the combined codes for OP-14/15),
+# then every Extra Booster, then every Premium Booster.
+SET_LIST = [
+    "OP-01", "OP-02", "OP-03", "OP-04", "OP-05", "OP-06", "OP-07",
+    "OP-08", "OP-09", "OP-10", "OP-11", "OP-12", "OP-13",
+    "OP14-EB04", "OP15-EB04", "OP-16",
+    "EB-01", "EB-02", "EB-03",
+    "PRB-01", "PRB-02",
+]
+
+# Safety net: if FEATURED_SETS ever gets a set added that isn't reflected
+# in the hand-written list above (e.g. a new EB/PRB or OP-17), catch it
+# here instead of silently leaving it out of the preview.
+_missing = set(FEATURED_SETS) - set(SET_LIST)
+if _missing:
+    print(f"NOTE: {_missing} are in FEATURED_SETS but not in this preview's SET_LIST — add them above.", file=sys.stderr)
+
+
+def _set_name(set_id, all_sets):
+    for s in all_sets:
+        if s["set_id"] == set_id:
+            return s["set_name"]
+    return set_id
+
+
+def _safe_top_n(set_id, list_type):
+    try:
+        markers = ALT_ART_MARKERS if list_type == "least_expensive" else None
+        return top_n_by_price(set_id, n=LIST_LENGTH, most_expensive=(list_type == "most_expensive"), alt_art_markers=markers)
+    except requests.exceptions.RequestException as e:
+        print(f"WARNING: fetch failed for {set_id} ({list_type}) — {e} — skipping", file=sys.stderr)
+        return []
+
+
+def main():
+    os.makedirs(OUT_DIR, exist_ok=True)
+    all_sets = get_all_sets()
+
+    built = 0
+    for set_id in SET_LIST:
+        set_name = _set_name(set_id, all_sets)
+        for list_type in ("most_expensive", "least_expensive"):
+            cards = _safe_top_n(set_id, list_type)
+            if not cards:
+                print(f"WARNING: 0 priced cards for {set_id} ({list_type}) — skipping", file=sys.stderr)
+                continue
+
+            filename = f"{set_id}-{list_type}.png"
+            out_path = os.path.join(OUT_DIR, filename)
+            build_list_image(
+                cards, list_type, set_name, out_path,
+                brand_name=f"@{BRAND_HANDLE}" if BRAND_HANDLE else BRAND_NAME,
+                n=LIST_LENGTH, set_id=set_id,
+            )
+            print(f"Built {filename}")
+            built += 1
+            time.sleep(0.5)  # be gentle with optcgapi.com across ~42 requests
+
+    print(f"\nDone — {built} images written to {OUT_DIR}/")
+
+
+if __name__ == "__main__":
+    main()
