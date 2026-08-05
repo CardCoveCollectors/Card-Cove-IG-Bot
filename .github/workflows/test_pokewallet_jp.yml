@@ -1,9 +1,10 @@
 name: TEST - Pokemon JP Sets + Top 10 (temporary, safe to delete after)
 
 # One-off manual test: lists all Japanese Pokemon sets, then dumps raw
-# card JSON for SV2a so we can see the real tcgplayer field shape.
-# Doesn't touch posts/, doesn't publish anything, doesn't commit
-# anything. Delete this file (and the workflow) once we're happy.
+# card JSON for SV2a, then tries /search as an alternative path to get
+# populated prices. Doesn't touch posts/, doesn't publish anything,
+# doesn't commit anything. Delete this file (and the workflow) once
+# we're happy.
 
 on:
   workflow_dispatch: {}
@@ -74,3 +75,10 @@ jobs:
         run: |
           curl -s -H "X-API-Key: $POKEWALLET_API_KEY" \
             "https://api.pokewallet.io/sets/23599?page=1&limit=3" | python3 -m json.tool
+
+      - name: Try /search instead — does it return populated prices for SV2a cards?
+        env:
+          POKEWALLET_API_KEY: ${{ secrets.POKEWALLET_API_KEY }}
+        run: |
+          curl -s -H "X-API-Key: $POKEWALLET_API_KEY" \
+            "https://api.pokewallet.io/search?q=SV2a&limit=5" | python3 -m json.tool
