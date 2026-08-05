@@ -18,11 +18,16 @@ jobs:
           curl -s -H "X-API-Key: $POKEWALLET_API_KEY" \
             "https://api.pokewallet.io/op/sets?language=jp" | python3 -m json.tool
 
-      - name: Fetch one JP set's cards (first page, small limit)
+      - name: Fetch one JP set's cards by group_id (Romance Dawn JP = -3)
         env:
           POKEWALLET_API_KEY: ${{ secrets.POKEWALLET_API_KEY }}
         run: |
-          echo "Edit SET_CODE below to match a real set_code from the output above, then re-run if needed."
-          SET_CODE="OP01"
           curl -s -H "X-API-Key: $POKEWALLET_API_KEY" \
-            "https://api.pokewallet.io/op/sets/$SET_CODE?page=1&limit=3&language=jp" | python3 -m json.tool
+            "https://api.pokewallet.io/op/sets/-3?page=1&limit=5" | python3 -m json.tool
+
+      - name: Also try by set_code directly (OP01-JP) for comparison
+        env:
+          POKEWALLET_API_KEY: ${{ secrets.POKEWALLET_API_KEY }}
+        run: |
+          curl -s -H "X-API-Key: $POKEWALLET_API_KEY" \
+            "https://api.pokewallet.io/op/sets/OP01-JP?page=1&limit=5" | python3 -m json.tool
