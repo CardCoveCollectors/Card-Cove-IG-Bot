@@ -1,0 +1,33 @@
+name: Preview ALL One Piece Sets (OP-01 to OP-16 + EB + PRB)
+
+# One-off batch preview — manual-only. Renders both Top-10 lists for
+# every set Card Cove Collectors tracks (all 16 mainline OP-01 through
+# OP-16 releases, plus every Extra Booster and Premium Booster) with the
+# new grid design, so you can see the whole run at once. Does NOT touch
+# the real rotation state and does NOT publish anything to Instagram.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  preview-all:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build a preview image for every mainline, EB, and PRB set
+        run: python scripts/preview_all_onepiece.py
+
+      - name: Upload all generated images so you can download and view them
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-all-onepiece
+          path: preview_all_onepiece/
+          retention-days: 7
