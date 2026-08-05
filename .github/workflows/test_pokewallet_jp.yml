@@ -1,0 +1,33 @@
+name: TEST - One Piece JP Top 10 Most Expensive (temporary, safe to delete after)
+
+# One-off manual test that runs the REAL fetch_prices_onepiece_jp.py
+# script against a couple of real Japanese sets and prints the Top 10
+# Most Expensive list for each. Doesn't touch posts/, doesn't publish
+# anything, doesn't commit anything. Delete this file (and the workflow)
+# once we're happy with the results.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Top 10 Most Expensive — OP01-JP (Romance Dawn)
+        env:
+          POKEWALLET_API_KEY: ${{ secrets.POKEWALLET_API_KEY }}
+        run: python scripts/fetch_prices_onepiece_jp.py -3
+
+      - name: Top 10 Most Expensive — OP16-JP (The Time of Battle)
+        env:
+          POKEWALLET_API_KEY: ${{ secrets.POKEWALLET_API_KEY }}
+        run: python scripts/fetch_prices_onepiece_jp.py -28
