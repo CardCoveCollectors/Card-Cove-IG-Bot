@@ -1,0 +1,49 @@
+name: Post One Piece to Instagram
+
+# Tue/Thu/Sat companion to post.yml (Pokemon). Same Instagram account,
+# same secrets, different schedule and script entrypoint.
+
+on:
+  schedule:
+    # 23:00 UTC, Tue/Thu/Sat = 7pm Eastern (6pm during EST) — same
+    # evening engagement window as the Pokemon schedule.
+    # Note: GitHub Actions cron doesn't auto-adjust for daylight saving,
+    # so this drifts by an hour twice a year — not worth worrying about.
+    - cron: "0 23 * * 2,4,6"
+  workflow_dispatch: {}  # lets you trigger a run manually from the Actions tab
+
+permissions:
+  contents: write  # needed so the workflow can commit the generated image back
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build image + caption
+        run: python scripts/main_onepiece.py build
+
+      - name: Commit generated image so it's publicly reachable
+        run: |
+          git config user.name "tcg-ig-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add posts/ state_onepiece.json
+          git commit -m "Generate One Piece post $(date -u +%Y-%m-%d)" || echo "Nothing to commit"
+          git push
+
+      - name: Wait for GitHub's CDN to pick up the new file
+        run: sleep 15
+
+      - name: Publish to Instagram
+        env:
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+        run: python scripts/main_onepiece.py publish
