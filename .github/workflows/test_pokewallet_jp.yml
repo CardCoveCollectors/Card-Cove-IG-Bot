@@ -4,6 +4,9 @@ name: TEST - PokeWallet JP Sets (temporary, safe to delete after)
 # like, and whether "Alt Art" (or similar) shows up in JP card names.
 # Doesn't touch posts/, doesn't publish anything, doesn't commit anything.
 # Delete this file (and the workflow) once we've seen the output.
+#
+# Uses curl (not Python's urllib) to fetch, since urllib's default User-Agent
+# gets blocked with a 403 by the API's protection — curl's User-Agent doesn't.
 
 on:
   workflow_dispatch: {}
@@ -16,34 +19,37 @@ jobs:
         env:
           POKEWALLET_API_KEY: ${{ secrets.POKEWALLET_API_KEY }}
         run: |
-          python3 << 'EOF'
-          import urllib.request, json, os
+          declare -A sets=(
+            ["-3"]="OP01-JP Romance Dawn"
+            ["-25"]="OP07-JP 500 Years in the Future"
+            ["-28"]="OP16-JP The Time of Battle"
+            ["-8"]="EB-01-JP Memorial Collection"
+          )
 
-          key = os.environ["POKEWALLET_API_KEY"]
+          for gid in "${!sets[@]}"; do
+            label="${sets[$gid]}"
+            echo ""
+            echo "=== $label (group_id $gid) ==="
+            curl -s -H "X-API-Key: $POKEWALLET_API_KEY" \
+              "https://api.pokewallet.io/op/sets/$gid?page=1&limit=200" > /tmp/resp.json
 
-          # group_id -> label, from the earlier /op/sets?language=jp scan
-          sets = {
-              "-3": "OP01-JP Romance Dawn",
-              "-25": "OP07-JP 500 Years in the Future",
-              "-28": "OP16-JP The Time of Battle",
-              "-8": "EB-01-JP Memorial Collection",
-          }
+            python3 - "$label" "$gid" << 'EOF'
+          import json, sys
 
-          for gid, label in sets.items():
-              url = f"https://api.pokewallet.io/op/sets/{gid}?page=1&limit=200"
-              req = urllib.request.Request(url, headers={"X-API-Key": key})
-              with urllib.request.urlopen(req) as resp:
-                  data = json.load(resp)
+          label, gid = sys.argv[1], sys.argv[2]
+          with open("/tmp/resp.json") as f:
+              data = json.load(f)
 
-              total = data.get("total")
-              cards = data.get("data", [])
-              matches = [c["name"] for c in cards if c.get("name") and "alt" in c["name"].lower()]
+          total = data.get("total")
+          cards = data.get("data", [])
+          matches = [c["name"] for c in cards if c.get("name") and "alt" in c["name"].lower()]
 
-              print(f"\n=== {label} (group_id {gid}) — total={total}, fetched={len(cards)}, alt-matches={len(matches)} ===")
-              for m in matches[:20]:
-                  print("   ", m)
-              if not matches:
-                  print("   (no 'alt' matches — showing 5 sample names instead)")
-                  for c in cards[:5]:
-                      print("   sample:", c.get("name"))
+          print(f"total={total}, fetched={len(cards)}, alt-matches={len(matches)}")
+          for m in matches[:20]:
+              print("   ", m)
+          if not matches:
+              print("   (no 'alt' matches — showing 5 sample names instead)")
+              for c in cards[:5]:
+                  print("   sample:", c.get("name"))
           EOF
+          done
