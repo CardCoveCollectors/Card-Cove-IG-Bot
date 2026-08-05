@@ -1,10 +1,9 @@
-name: TEST - One Piece JP Top 10 Most Expensive (temporary, safe to delete after)
+name: TEST - Pokemon JP Sets + Top 10 (temporary, safe to delete after)
 
-# One-off manual test that runs the REAL fetch_prices_onepiece_jp.py
-# script against a couple of real Japanese sets and prints the Top 10
-# Most Expensive list for each. Doesn't touch posts/, doesn't publish
-# anything, doesn't commit anything. Delete this file (and the workflow)
-# once we're happy with the results.
+# One-off manual test: lists all Japanese Pokemon sets, then runs the real
+# fetch_prices_pokemon_jp.py script's Top 10 Most Expensive for one of
+# them. Doesn't touch posts/, doesn't publish anything, doesn't commit
+# anything. Delete this file (and the workflow) once we're happy.
 
 on:
   workflow_dispatch: {}
@@ -22,12 +21,21 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Top 10 Most Expensive — OP01-JP (Romance Dawn)
+      - name: List all Japanese Pokemon sets
         env:
           POKEWALLET_API_KEY: ${{ secrets.POKEWALLET_API_KEY }}
-        run: python scripts/fetch_prices_onepiece_jp.py -3
+        run: |
+          python3 -c "
+          import sys
+          sys.path.insert(0, 'scripts')
+          from fetch_prices_pokemon_jp import get_jp_sets
+          sets = get_jp_sets()
+          print(f'Found {len(sets)} Japanese sets')
+          for s in sorted(sets, key=lambda x: x.get('release_date') or '', reverse=True)[:40]:
+              print(f\"  set_id={s['set_id']}  set_code={s.get('set_code')}  cards={s.get('card_count')}  released={s.get('release_date')}  -  {s['name']}\")
+          "
 
-      - name: Top 10 Most Expensive — OP16-JP (The Time of Battle)
+      - name: Top 10 Most Expensive — SV2a (Pokemon Card 151, Japanese)
         env:
           POKEWALLET_API_KEY: ${{ secrets.POKEWALLET_API_KEY }}
-        run: python scripts/fetch_prices_onepiece_jp.py -28
+        run: python scripts/fetch_prices_pokemon_jp.py 23599
