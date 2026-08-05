@@ -2,7 +2,8 @@ name: TEST - Pokemon JP Sets + Top 10 (temporary, safe to delete after)
 
 # One-off manual test: lists all Japanese Pokemon sets, then runs the real
 # fetch_prices_pokemon_jp.py script's Top 10 Most Expensive for one of
-# them. Doesn't touch posts/, doesn't publish anything, doesn't commit
+# them, then digs into why the known-expensive chase cards are missing.
+# Doesn't touch posts/, doesn't publish anything, doesn't commit
 # anything. Delete this file (and the workflow) once we're happy.
 
 on:
@@ -72,3 +73,50 @@ jobs:
         env:
           POKEWALLET_API_KEY: ${{ secrets.POKEWALLET_API_KEY }}
         run: python scripts/fetch_prices_pokemon_jp.py SV2a
+
+      - name: Does the search index even have SV2a's Charizard ex?
+        env:
+          POKEWALLET_API_KEY: ${{ secrets.POKEWALLET_API_KEY }}
+        run: |
+          curl -s -H "X-API-Key: $POKEWALLET_API_KEY" \
+            "https://api.pokewallet.io/search?q=charizard+ex+151&limit=20" | python3 -m json.tool
+
+      - name: How many total /search pages does "SV2a" actually span, and where do 200+ priced results come from?
+        env:
+          POKEWALLET_API_KEY: ${{ secrets.POKEWALLET_API_KEY }}
+        run: |
+          python3 -c "
+          import sys
+          sys.path.insert(0, 'scripts')
+          from fetch_prices_pokemon_jp import _session, _headers, API_BASE, _resolve_jp_set
+
+          info = _resolve_jp_set('SV2a')
+          target_id = info['set_id']
+          print(f\"Target set_id={target_id}, expected card_count={info.get('card_count')}\")
+
+          seen = set()
+          page = 1
+          while page <= 10:
+              resp = _session.get(f'{API_BASE}/search', params={'q': 'SV2a', 'page': page, 'limit': 100}, headers=_headers(), timeout=30)
+              resp.raise_for_status()
+              payload = resp.json()
+              batch = payload.get('results', [])
+              matched_this_page = 0
+              top_price_this_page = 0
+              for c in batch:
+                  info2 = c.get('card_info') or {}
+                  if info2.get('set_id') != target_id:
+                      continue
+                  matched_this_page += 1
+                  seen.add(c.get('id'))
+                  tcg = c.get('tcgplayer') or {}
+                  prices = tcg.get('prices') or []
+                  vals = [p.get('market_price') for p in prices if p.get('market_price') is not None]
+                  if vals:
+                      top_price_this_page = max(top_price_this_page, max(vals))
+              total_pages = (payload.get('pagination') or {}).get('total_pages')
+              print(f'page {page}: {len(batch)} raw results, {matched_this_page} matched set_id, running unique total={len(seen)}, max price seen this page=\${top_price_this_page:.2f}, total_pages={total_pages}')
+              if not batch:
+                  break
+              page += 1
+          "
