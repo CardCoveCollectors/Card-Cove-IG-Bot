@@ -1,8 +1,8 @@
 name: TEST - Pokemon JP Sets + Top 10 (temporary, safe to delete after)
 
-# One-off manual test: lists all Japanese Pokemon sets, then runs the real
-# fetch_prices_pokemon_jp.py script's Top 10 Most Expensive for one of
-# them. Doesn't touch posts/, doesn't publish anything, doesn't commit
+# One-off manual test: lists all Japanese Pokemon sets, then dumps raw
+# card JSON for SV2a so we can see the real tcgplayer field shape.
+# Doesn't touch posts/, doesn't publish anything, doesn't commit
 # anything. Delete this file (and the workflow) once we're happy.
 
 on:
@@ -68,23 +68,9 @@ jobs:
                   print(f\"  set_id={s['set_id']}  set_code={s.get('set_code')}  cards={s.get('card_count')}  released={s.get('release_date')!r}  -  {s['name']}\")
           "
 
-      - name: Top 10 Most Expensive — look up SV2a's real ID, then test it
+      - name: Dump raw JSON for 3 SV2a cards to inspect the real tcgplayer field
         env:
           POKEWALLET_API_KEY: ${{ secrets.POKEWALLET_API_KEY }}
         run: |
-          python3 -c "
-          import sys
-          sys.path.insert(0, 'scripts')
-          from fetch_prices_pokemon_jp import get_jp_sets
-
-          matches = [s for s in get_jp_sets() if (s.get('set_code') or '').lower() == 'sv2a']
-          if not matches:
-              print('No JP set found with set_code == SV2a — check the modern-era list above for the real code/ID.')
-          for s in matches:
-              print(f\"Found: set_id={s['set_id']}  name={s['name']}  cards={s.get('card_count')}\")
-              with open('sv2a_set_id.txt', 'w') as f:
-                  f.write(str(s['set_id']))
-          "
-          if [ -f sv2a_set_id.txt ]; then
-            python scripts/fetch_prices_pokemon_jp.py "$(cat sv2a_set_id.txt)"
-          fi
+          curl -s -H "X-API-Key: $POKEWALLET_API_KEY" \
+            "https://api.pokewallet.io/sets/23599?page=1&limit=3" | python3 -m json.tool
