@@ -1,0 +1,55 @@
+name: Post Pokemon Japan to Instagram
+
+# Tue/Thu/Sat at 10am Eastern — same days as post_onepiece.yml (English
+# One Piece), but a different time of day (that one posts 7pm Eastern),
+# so the two don't collide. 3 different Japanese sets a week, same
+# rotate-one-set-per-posting-day model as the other two pipelines. Same
+# Instagram account, same secrets, plus POKEWALLET_API_KEY for JP prices.
+
+on:
+  schedule:
+    # 14:37 UTC, Tue/Thu/Sat = ~10am Eastern (11am during EDT). Off the
+    # hour mark on purpose — see post_pokemon.yml's comment for why.
+    # Note: GitHub Actions cron doesn't auto-adjust for daylight saving,
+    # so this drifts by an hour twice a year — not worth worrying about
+    # (same tradeoff already accepted on the other two schedules).
+    - cron: "37 14 * * 2,4,6"
+  workflow_dispatch: {}  # lets you trigger a run manually from the Actions tab
+
+permissions:
+  contents: write  # needed so the workflow can commit the generated image back
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build image + caption
+        env:
+          POKEWALLET_API_KEY: ${{ secrets.POKEWALLET_API_KEY }}
+        run: python scripts/main_pokemon_jp.py build
+
+      - name: Commit generated image so it's publicly reachable
+        run: |
+          git config user.name "tcg-ig-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add posts/ state_pokemon_jp.json
+          git commit -m "Generate Pokemon Japan post $(date -u +%Y-%m-%d)" || echo "Nothing to commit"
+          git push
+
+      - name: Wait for GitHub's CDN to pick up the new file
+        run: sleep 15
+
+      - name: Publish to Instagram
+        env:
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+        run: python scripts/main_pokemon_jp.py publish
