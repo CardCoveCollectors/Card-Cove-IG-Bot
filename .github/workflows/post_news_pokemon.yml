@@ -1,0 +1,74 @@
+name: Post Pokemon News to Instagram
+
+# Daily, but ONLY posts if something genuinely newsworthy turns up —
+# main_news_pokemon.py build exits cleanly with no posts/latest_news_pokemon.json
+# on a quiet news day, and the "found" check below skips commit + publish
+# entirely in that case. No forced daily post just to hit a schedule.
+#
+# Fully independent of post_news_onepiece.yml — separate feed, separate
+# state file, separate schedule — so neither franchise's news crowds out
+# the other.
+
+on:
+  schedule:
+    # 12:43 UTC daily = ~8:43am Eastern (7:43am during EST). Off the hour
+    # mark on purpose — see post_pokemon.yml's comment for why.
+    - cron: "43 12 * * *"
+  workflow_dispatch: {}  # lets you trigger a run manually from the Actions tab
+
+permissions:
+  contents: write  # needed so the workflow can commit the generated image back
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check feed and build a post if something new is found
+        run: python scripts/main_news_pokemon.py build
+
+      - name: Check whether a post was actually built
+        id: check
+        run: |
+          if [ -f posts/latest_news_pokemon.json ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit generated image so it's publicly reachable
+        if: steps.check.outputs.found == 'true'
+        run: |
+          git config user.name "tcg-ig-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add posts/ state_news_pokemon.json
+          git commit -m "Generate Pokemon news post $(date -u +%Y-%m-%d)" || echo "Nothing to commit"
+          for i in 1 2 3 4 5; do
+            git push && break
+            echo "Push rejected (attempt $i) — pulling and retrying..."
+            git pull --rebase origin main
+            sleep 5
+          done
+
+      - name: Wait for GitHub's CDN to pick up the new file
+        if: steps.check.outputs.found == 'true'
+        run: sleep 15
+
+      - name: Publish to Instagram
+        if: steps.check.outputs.found == 'true'
+        env:
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+        run: python scripts/main_news_pokemon.py publish
+
+      - name: No news today
+        if: steps.check.outputs.found == 'false'
+        run: echo "No new Pokemon TCG news found this run — nothing posted today."

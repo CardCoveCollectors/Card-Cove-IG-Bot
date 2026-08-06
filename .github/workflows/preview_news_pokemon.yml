@@ -1,0 +1,45 @@
+name: Generate Pokemon News Preview Post (no Instagram)
+
+# Manual-only — lets you see what the Pokemon news pipeline would post
+# right now (real headline, real caption) without publishing anything or
+# needing Instagram/Meta credentials. Safe to run as many times as you
+# want.
+#
+# A "no new news right now" outcome is normal and not an error — check
+# the run log if no artifact appears.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check feed and build one post (if anything new) — not committed, not published
+        run: python scripts/main_news_pokemon.py build
+
+      - name: Show the caption in the run log (if a post was built)
+        run: |
+          if [ -f posts/latest_news_pokemon.json ]; then
+            cat posts/latest_news_pokemon.json
+          else
+            echo "No new Pokemon TCG news found this run — nothing to preview right now."
+          fi
+
+      - name: Upload the generated image so you can download and view it (if any)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: preview-post-news-pokemon
+          path: posts/
+          retention-days: 7
+          if-no-files-found: ignore
