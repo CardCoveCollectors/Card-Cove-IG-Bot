@@ -1,0 +1,69 @@
+name: TEST - Scrape real articles behind Google News links
+
+# Disposable test workflow. Google News RSS <link> values are redirect
+# wrappers, not the real article URL. This checks whether we can follow
+# those redirects and pull a usable og:image + body text from the real
+# article, since several source sites (PokeBeach, Serebii) already
+# blocked direct scraping when we tested their own RSS feeds. Safe to
+# delete once the real pipeline is built and verified.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4
+
+      - name: Pull a few real news links and try to scrape each one
+        run: |
+          python3 << 'EOF'
+          import requests
+          from xml.etree import ElementTree
+          from bs4 import BeautifulSoup
+
+          HEADERS = {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                            "(KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+          }
+
+          feeds = [
+              ("Pokemon TCG", "https://news.google.com/rss/search?q=%22Pokemon%20TCG%22&hl=en-US&gl=US&ceid=US:en"),
+              ("One Piece Card Game", "https://news.google.com/rss/search?q=%22One%20Piece%20Card%20Game%22&hl=en-US&gl=US&ceid=US:en"),
+          ]
+
+          for topic, feed_url in feeds:
+              print(f"\n=== {topic} ===")
+              resp = requests.get(feed_url, headers=HEADERS, timeout=30)
+              root = ElementTree.fromstring(resp.content)
+              items = root.findall(".//item")[:3]
+              for item in items:
+                  title = item.findtext("title")
+                  link = item.findtext("link")
+                  print(f"\n--- {title}")
+                  print(f"Google News link: {link}")
+                  try:
+                      r = requests.get(link, headers=HEADERS, timeout=15, allow_redirects=True)
+                      print(f"Resolved URL: {r.url}")
+                      print(f"HTTP status: {r.status_code}")
+                      soup = BeautifulSoup(r.text, "html.parser")
+                      og_image = soup.find("meta", property="og:image")
+                      og_desc = soup.find("meta", property="og:description")
+                      paragraphs = [p.get_text(strip=True) for p in soup.find_all("p")]
+                      long_paragraphs = [p for p in paragraphs if len(p) > 40]
+                      print(f"og:image found: {bool(og_image)} -> {og_image['content'] if og_image and og_image.get('content') else None}")
+                      print(f"og:description found: {bool(og_desc)}")
+                      print(f"Usable <p> paragraphs found: {len(long_paragraphs)}")
+                      if long_paragraphs:
+                          print(f"First paragraph sample: {long_paragraphs[0][:200]}")
+                  except Exception as e:
+                      print(f"FAILED to scrape: {e}")
+          EOF
