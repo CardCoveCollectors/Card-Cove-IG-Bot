@@ -1,7 +1,8 @@
 {
-  "last_index": 0,
+  "last_index": 1,
   "last_list_type": "least_expensive",
   "history": [
-    "me2"
+    "me2",
+    "me1"
   ]
 }
