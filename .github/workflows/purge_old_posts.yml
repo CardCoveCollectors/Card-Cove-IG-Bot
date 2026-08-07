@@ -1,0 +1,43 @@
+name: ONE-TIME - Purge old post images
+
+# Disposable, one-time cleanup: deletes every previously-committed image
+# in posts/ across all pipelines, since none of them were ever cleaned up
+# automatically until posts_cleanup.py was added. Safe to run once — going
+# forward, every pipeline's build step cleans up its OWN old images
+# automatically (see posts_cleanup.py), so this workflow should never be
+# needed again after this. Feel free to delete this file once you've run
+# it.
+#
+# Does NOT touch state_*.json (rotation memory) or the latest_*.json meta
+# files — those get overwritten cleanly by each pipeline's next real build
+# regardless of what's here. Only removes the accumulated *.png files
+# sitting in posts/.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Delete all accumulated post images
+        run: |
+          shopt -s nullglob
+          files=(posts/*.png)
+          echo "Found ${#files[@]} image(s) to remove."
+          rm -f posts/*.png
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A posts/
+          git commit -m "One-time cleanup: purge accumulated old post images" || echo "Nothing to commit"
+          for i in 1 2 3 4 5; do
+            git push && break
+            echo "Push rejected (attempt $i) — pulling and retrying..."
+            git pull --rebase origin main
+            sleep 5
+          done
