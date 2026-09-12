@@ -1,5 +1,5 @@
 {
-  "last_index": 2,
+  "last_index": 4,
   "last_list_type": "least_expensive",
   "history": [
     "me2",
@@ -20,6 +20,8 @@
     "sv3",
     "me2",
     "me1",
-    "zsv10pt5"
+    "zsv10pt5",
+    "rsv10pt5",
+    "sv10"
   ]
 }
