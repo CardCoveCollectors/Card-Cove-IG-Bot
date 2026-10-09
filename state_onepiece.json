@@ -1,5 +1,5 @@
 {
-  "last_index": 4,
+  "last_index": 5,
   "history": [
     "OP-16",
     "OP15-EB04",
@@ -26,6 +26,7 @@
     "OP15-EB04",
     "EB-03",
     "OP14-EB04",
-    "OP-13"
+    "OP-13",
+    "PRB-02"
   ]
 }
