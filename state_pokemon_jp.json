@@ -1,5 +1,5 @@
 {
-  "last_index": 41,
+  "last_index": 43,
   "history": [
     "m5",
     "m5",
@@ -42,6 +42,8 @@
     "SV2a",
     "svP1",
     "SV2D",
-    "SV2P"
+    "SV2P",
+    "SV-P/CS",
+    "svC"
   ]
 }
